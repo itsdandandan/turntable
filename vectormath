@@ -13,8 +13,8 @@ void loop()
     delay(100);                                                                     
     while(Serial.available()==0) {}                                       // wait until input given
     reading=Serial.parseInt();                                            // read input
-    if (reading != 0)                                                     // if reading isnt zero, proceed
-    {
+    if (reading != 0)                                                     // if the reading isnt zero, proceed
+    {                                                                     // if it is zero, function returns to start of loop()   [zero may indicate a fault in data acquisition]
     Serial.println(reading);
     delay(2000);    
                                         
