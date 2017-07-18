@@ -1,5 +1,6 @@
 #include <FreqCounter.h>
 
+// static pin @ 5, digital
 
 void setup() {
   Serial.begin(57600);                    // connect to the serial port
