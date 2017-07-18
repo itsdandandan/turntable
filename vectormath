@@ -24,7 +24,7 @@ void loop()
                                                                           // here we split the wind direction to X & Y components
   
                                                                           // a running average for wind vectors
-  windAvgX = windAvgX*.6+cos(theta)*.4;                                   // calculate your wind vectors for X and Y
+  windAvgX = windAvgX*.6+cos(theta)*.4;                                   // calculate your wind vectors for X and Y, prev results weighted
   windAvgY = windAvgY*.6+sin(theta)*.4;
   Serial.print("AvgX, radians ");                                         // print your avg x and avg y
   Serial.println(windAvgX);
