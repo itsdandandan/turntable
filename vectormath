@@ -1,0 +1,49 @@
+float windAvgX;
+float windAvgY;
+long reading;
+
+void setup()
+{
+Serial.begin(19200);
+}
+
+void loop()
+{
+    Serial.println("  enter a reading (b/w 0 & 360) ");                   // call for input
+    delay(100);                                                                     
+    while(Serial.available()==0) {}                                       // wait until input given
+    reading=Serial.parseInt();                                            // read input
+    if (reading != 0)                                                     // if reading isnt zero, proceed
+    {
+    Serial.println(reading);
+    delay(2000);    
+                                        
+  // convert reading to radians  
+  float theta = reading / 180.0 * PI;                                     // convert to radians
+  delay(100);
+                                                                          // here we split the wind direction to X & Y components
+  
+                                                                          // a running average for wind vectors
+  windAvgX = windAvgX*.6+cos(theta)*.4;                                   // calculate your wind vectors for X and Y
+  windAvgY = windAvgY*.6+sin(theta)*.4;
+  Serial.print("AvgX, radians ");                                         // print your avg x and avg y
+  Serial.println(windAvgX);
+  delay(400);
+  Serial.print("AvgY, radians ");
+  Serial.println(windAvgY);
+  delay(400);
+  
+  // get the result in degrees
+  theta =  atan2(windAvgY, windAvgX) / PI * 180;                          // use your X & Y to determine your theta, now in the range of -180:180
+  delay(400);
+  Serial.print(theta);
+  Serial.println(", before conversion.");
+  delay(400);
+
+                                                                          // your theta is between -180 & 180. change this to 0-360.  
+  if(theta < 0) theta += 360;
+  delay(400);
+  Serial.print(theta);
+  Serial.println(", after conversion.");
+    }
+}
