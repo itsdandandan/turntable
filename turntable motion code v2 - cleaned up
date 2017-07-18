@@ -87,9 +87,7 @@ void nothing()                                                           // your
                                                                          // prompt for new position
     while(Serial.available()==0) {}                                      // wait until value is entered
     newPOS=Serial.parseInt();                                            // save value as newPOS, our newest requested position
-    while(Serial.available() > 0) {Serial.read();};                      //
-    flag = 2;                                                            // set flag to 2, prompting our backwards-moving function, for returning to our zero position.
-    Serial.print("flag set to 2");
+    while(Serial.available() > 0) {Serial.read();};                      
   */
 
   for (i = 0; i < 11; i++)                                               // just a placeholder until data acquisition is figured out
