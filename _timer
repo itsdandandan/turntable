@@ -12,9 +12,7 @@ void setup()
 void loop() 
 { 
  if((millis() - previousTime) > 1000) 
- {  // if 5 mins have passed since started counting 
-   x++;
-   Serial.print(x);
+ {  // if ___ ms have passed since you started counting 
    previousTime = millis();
  }
 }
