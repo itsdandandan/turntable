@@ -1,19 +1,20 @@
 #include <MsTimer2.h>
 
-long previousTime = 0; 
+long previousTime; 
 int x;
 
 void setup() 
 { 
- previousTime = millis(); // just initialize the time counter.
-} 
+  previousTime = millis();
+  Serial.begin(9600);
+}
 
 void loop() 
 { 
- if((millis() - previousTime) >= 30000) 
+ if((millis() - previousTime) > 1000) 
  {  // if 5 mins have passed since started counting 
-   previousTime = 0; 
    x++;
    Serial.print(x);
+   previousTime = millis();
  }
 }
