@@ -1,0 +1,136 @@
+// include stepper library
+#include <AccelStepper.h>
+#include <Stepper.h>
+
+AccelStepper stepper(1, 8, 9);                                           // Define a stepper and the pins it will use
+const int stepsPerRevolution = 400;                                      // Nema34 motor has 200 steps in 360 degrees rotation (HW34-506 motor)
+
+int POS;                                                                 // position variable, holds most recent position reached
+int newPOS;                                                              // stores most recent position call (so you have your two most recent ones)
+char flag;                                                               // used to run functions in the same order each time (may be redundant after latest edits)
+int timer;
+
+char rainflag;                                                           // 0 = no rain, 1 = raining (if raining, add 180 degrees to position, see lines 40 and 54)
+char x;                                                                  // for counting (unused right now)
+char i;
+int total;                                                               // variable for the running total (unused right now, may be used with data acquisition later)
+
+char inputPin = 5;
+char countdata;                                                          // number of data points counted
+int average;                                                             // average of data so far
+int halfrev;                                                             // steps in half a revolution (turntable)
+
+float windAvgX;
+float windAvgY;
+long reading;
+
+void setup()
+
+{
+  stepper.setMaxSpeed(30);                                               //self explanatory (in steps per second)
+  stepper.setAcceleration(10);                                           //self explanatory (use 10 (steps*s^-2) for a standardized 45 steps to decelerate to zero)
+  Serial.begin(9600);                                                    //activates serial interface
+  pinMode(10, OUTPUT);                                                   //set pin 10 as output (pin 10 connects to ENABLE+ pin on stepper driver, necessary to operate motor)
+  digitalWrite(10, HIGH);                                                //set pin 10 to logic HIGH (to ENABLE your stepper driver)
+}
+
+void forward()                                                           // your function for moving the turntable forwards
+
+{
+  rainflag = 0;
+  if (rainflag == 0)
+  {
+    Serial.print(", forward: good conditions, ");                                                // move towards your position value
+  }  
+  if (rainflag == 1)
+  {
+    Serial.print(", forward: precipitating");                            // identical to earlier IF statement, just offset.  (position + 180 degrees, to face away from the rain) 
+    if (theta<180)
+    {
+      theta = theta + 180;
+    }
+    if (theta>180)
+    {
+      theta = theta - 180;     
+    }                                         
+  }
+  // some conversion of theta (degrees) to POS (in steps)                                                                       
+  stepper.moveTo(POS);                                                   // move towards your position value
+  while (stepper.currentPosition() != (POS - 45))                        // constant speed towards zero, until a certain number of steps from zero (here, 45)
+    {
+      stepper.run();                                                     // run until 40 steps away from zero
+    }
+  stepper.stop();                                                        // stop as fast as possible: sets new target
+  stepper.runToPosition(); 
+  Serial.print("done");                                                  // set flag to 0, promtping our "off" function, which waits for a new input before moving
+  delay(100);
+}
+void getAngle()
+
+{
+  Serial.println("  enter a reading (b/w 0 & 360) ");
+  delay(100);
+  while (Serial.available() == 0) {}
+  reading = Serial.parseInt();
+  if (reading != 0)
+  {
+    Serial.println(reading);
+    delay(2000);
+
+    // convert reading to radians
+    float theta = reading / 180.0 * PI;
+    delay(100);
+
+    // running average
+    windAvgX = windAvgX * .75 + cos(theta) * .25;
+    windAvgY = windAvgY * .75 + sin(theta) * .25;
+    Serial.print("AvgX, radians ");
+    Serial.println(windAvgX);
+    delay(400);
+    Serial.print("AvgY, radians ");
+    Serial.println(windAvgY);
+    delay(400);
+
+    // get the result in degrees
+    theta =  atan2(windAvgY, windAvgX) / PI * 180;
+    delay(400);
+    Serial.print(theta);
+    Serial.println(", before conversion.");
+    delay(400);
+
+    // result is -180 to 180. change this to 0-360.
+    if (theta < 0) theta += 360;
+    delay(400);
+    Serial.print(theta);
+    Serial.println(", after conversion.");
+  } 
+}
+
+void nothing()                                                           // your function for waiting for inputs
+
+//until weather data acquisition method is finalized, digital inputs used to enter discrete positions from 0 to 400 (in steps, where 400 steps = 1 revolution). 800steps = 2rev, 1200steps = 3rev, etc.
+
+{
+  for (i = 0; i < 11; i++)                                               // just a placeholder until data acquisition is figured out
+  {
+    int dir = digitalRead(inputPin);                                     // replace this with your function for reading frequency
+    total = total + dir;
+    timer = millis() + 60000;
+    while (millis() < timer);
+  }
+  average = total / i;
+  Serial.print(average);
+  reading = average;
+  timer = millis() + 60000;
+}
+
+void loop()
+
+// main function. simple loop, references the functions defined above
+// contains the functions defined above
+
+{                                                    
+    forward();
+    nothing();
+    getAngle();    // remove the weighting if youre averaging your frequencies anyway in nothing(), above
+}
