@@ -1,0 +1,89 @@
+#include <FreqCounter.h>
+
+// digital input, pin 5
+
+long int frq;
+float previousTime;
+
+int theta;
+int reading;
+float windAvgX;
+float windAvgY;
+
+char x;
+char i;
+
+
+void setup() {
+  Serial.begin(9600);                    // connect to the serial port
+  Serial.println("Frequency Counter");
+}
+
+void getFreq() {
+
+ FreqCounter::f_comp= 8;             // Set compensation to 12
+ FreqCounter::start(100);            // Start counting with gatetime of 1s
+ while (FreqCounter::f_ready == 0)         // wait until counter ready
+ 
+ frq=FreqCounter::f_freq;            // read result
+ Serial.print("your frequency is ");
+ Serial.println(frq);                // print result
+ delay(20);
+}
+
+void wait()
+{ 
+ previousTime = millis();
+ while (millis() - previousTime < 5000);
+ if((millis() - previousTime) > 3000) 
+ {  // if _ mins have passed since started counting 
+   x++;
+   previousTime = millis();
+ }
+}
+
+void getAngle()
+
+{
+    frq -= 100;
+    reading = frq;
+    Serial.print("your reading, b/w 0 and 360, is ");
+    Serial.println(reading);
+    delay(400);
+
+    // convert reading to radians
+    float theta = reading / 180.0 * PI;
+    delay(100);
+
+    // running average
+    windAvgX = windAvgX * .6 + cos(theta) * .4;
+    windAvgY = windAvgY * .6 + sin(theta) * .4;
+    Serial.print("AvgX, radians ");
+    Serial.println(windAvgX);
+    delay(400);
+    Serial.print("AvgY, radians ");
+    Serial.println(windAvgY);
+    delay(400);
+
+    // get the result in degrees
+    theta =  atan2(windAvgY, windAvgX) / PI * 180;
+    delay(400);
+    Serial.print(theta);
+    Serial.println(", before conversion.");
+    delay(400);
+
+    // result is -180 to 180. change this to 0-360.
+    if (theta < 0) theta += 360;
+    delay(400);
+    Serial.print(theta);
+    Serial.println(", after conversion.");
+  } 
+
+void loop() 
+{
+  wait();
+  getFreq();
+  getAngle();
+}
+  
+
