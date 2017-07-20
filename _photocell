@@ -1,0 +1,30 @@
+int photocellPin = 0;     // the cell and pulldown resistor located at pin ___
+int photocellReading;     // the analog reading coming from the sensor divider
+int LEDpin = ___;         // connect LED to pin ___ (has to be a PWM pin)
+int brightness;        // stores your read brightness from the photocell... past a certain brightness, we can consider the LED to be detected (needs some calibration first)
+
+
+void setup() 
+{
+  Serial.begin(9600);
+  pinMode ( , HIGH);   // let your LED always be high  
+}
+ 
+void loop() 
+{
+  photocellReading = analogRead(photocellPin);  
+  Serial.print("Analog reading = ");
+  Serial.println(photocellReading);     // the raw analog reading
+ 
+  //now we have to map 0-1023 to 0-255 (or whatever your range is) since thats the range analogWrite uses
+  brightness = map(photocellReading, 0, 1023, 0, 255);
+  // something to rotate the turntable one revolution
+  if (photocellReading > 800)  // arbitrary value, needs calibration for proper value
+  {
+    // consider LED detected
+    // treat as zero point for turntable
+    // stop at zero somehow, register as your zero position
+    // consider turntable zeroed out
+  }
+  delay(100);
+}
