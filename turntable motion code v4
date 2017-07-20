@@ -1,0 +1,156 @@
+// include stepper library
+#include <AccelStepper.h>
+#include <Stepper.h>
+#include <FreqCounter.h>
+#include <MsTimer2.h>
+
+AccelStepper stepper(1, 8, 9);                                           // Define a stepper and the pins it will use
+const int stepsPerRevolution = 400;                                      // for the motor. Nema34 motor has 200 steps in 360 degrees rotation (HW34-506 motor)
+const int fullrev = 2400;                                                // for the turntable
+int halfrev = (fullrev/2);                                               
+
+int POS;                                                                 // position variable, holds most recent position reached
+int newPOS;                                                              // 
+char flag;                                                               // 
+int timer;
+
+char rainflag;                                                           // 0 = no rain, 1 = raining (if raining, add 180 degrees to position, see lines 40 and 54)
+char x;                                                                  // for counting (unused right now)
+char i;
+int total;                                                               // variable for the running total (unused right now, may be used with data acquisition later)
+
+char countdata;                                                          // number of data points counted
+int average;                                                             // average of data so far                                                           
+
+long int frq;
+long int lastfrq;
+float previousTime;
+
+int theta;
+int reading;
+float windAvgX;
+float windAvgY;
+
+void setup()
+{
+  stepper.setMaxSpeed(30);                                               //self explanatory (in steps per second)
+  stepper.setAcceleration(10);                                           //self explanatory (use 10 (steps*s^-2) for a standardized 45 steps to decelerate to zero)
+  Serial.begin(9600);                                                    //activates serial interface
+  pinMode(10, OUTPUT);                                                   //set pin 10 as output (pin 10 connects to ENABLE+ pin on stepper driver, necessary to operate motor)
+  digitalWrite(10, HIGH);                                                //set pin 10 to logic HIGH (to ENABLE your stepper driver)
+}
+void forward()                                                           // your function for moving the turntable forwards
+{
+  rainflag = 0;                                                          // for testing purposes, delete later
+  if (rainflag == 0)
+  {
+    Serial.print(", forward: good conditions, ");                        // move towards your position value
+  }  
+  if (rainflag == 1)
+  {
+    Serial.print(", forward: precipitating");                            // identical to earlier IF statement, just offset.  (position + 180 degrees, to face away from the rain) 
+    if (theta<180)
+    {
+      POS -= halfrev;
+    }
+    if (theta>180)
+    {
+      POS += halfrev;     
+    }                                         
+  }
+  // some conversion of theta (degrees) to POS (in steps)                                                                       
+  stepper.moveTo(POS);                                                   // move towards your position value
+  while (stepper.currentPosition() != (POS - 45))                        // constant speed towards zero, until a certain number of steps from zero (here, 45)
+    {
+      stepper.run();                                                     // run until 40 steps away from zero
+    }
+  stepper.stop();                                                        // stop as fast as possible: sets new target
+  stepper.runToPosition(); 
+  Serial.print("done");                                                 
+  delay(100);
+}
+void getFreq() 
+{
+  for (x=0;x<10;x++)
+    {
+    FreqCounter::f_comp= 8;             // Set compensation to 12
+    FreqCounter::start(100);            // Start counting with gatetime of 1s
+    while (FreqCounter::f_ready == 0)   // wait until counter ready
+ 
+    frq=FreqCounter::f_freq;            // read result
+    total = frq + total;
+    Serial.print("frq is ");
+    Serial.println(frq);                // print result
+    Serial.print("total is ");
+    Serial.println(total);
+    wait();
+    }
+  frq = total/10;
+}
+void wait()
+{ 
+ Serial.println("waiting");
+ previousTime = millis();
+ while (millis() - previousTime < 2000) {};
+ if((millis() - previousTime) > 2000) 
+ {  // if 2 mins have passed since function commenced
+   x++;
+   previousTime = millis();
+   Serial.print(x);
+ }
+}
+void getAngle()
+{
+    frq -= 100;
+    reading = frq;
+    Serial.print("your reading, b/w 0 and 360, is ");
+    Serial.println(reading);
+    delay(100);
+
+    // convert reading to radians
+    float theta = reading / 180.0 * PI;
+    delay(100);
+
+    // running average? possible here
+    windAvgX = cos(theta);
+    windAvgY = sin(theta);
+    Serial.print("AvgX, radians ");
+    Serial.println(windAvgX);
+    delay(100);
+    Serial.print("AvgY, radians ");
+    Serial.println(windAvgY);
+    delay(100);
+
+    // get the result in degrees
+    theta =  atan2(windAvgY, windAvgX) / PI * 180;
+    delay(100);
+    Serial.print(theta);
+    Serial.println(", before conversion.");
+    delay(100);
+
+    // result is -180 to 180. change this to 0-360.
+    if (theta < 0) theta += 360;
+    delay(100);
+    Serial.print(theta);
+    Serial.println(", after conversion.");
+  Serial.println(theta);
+  delay(200);
+  POS = theta*2400/360;
+  if (POS > 1200) POS = POS-2400;
+  Serial.println(" ");
+  Serial.print(" steps away from zero: ");
+  Serial.println(POS);
+  Serial.println(" ");
+  delay(200);
+} 
+void loop() 
+{
+  for (i = 0; i < 11; i++)
+  {
+    getFreq();
+    total = 0;
+    getAngle();
+    forward();
+  }
+  //zero();       // function that zeroes out your turntable, every 10 movements
+}
