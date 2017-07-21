@@ -90,10 +90,11 @@ void getFreq()
     Serial.println(total);
     wait();                                                              // call wait function for _____ ms wait period
     }
-  stddev = (stats.stdev(table,10));                                            // get a standard deviation
+  stddev = (stats.stdev(table,10));                                      // get a standard deviation
   Serial.println(stddev);
   delay(3000);
   frq = total/10;                                                        // get an average frq reading using your total
+  memset(table, 0, 10);
   if (stddev > 5)
   {
     wait();
