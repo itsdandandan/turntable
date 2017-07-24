@@ -7,12 +7,12 @@
 
 
 AccelStepper stepper(1, 8, 9);                                           // Define a stepper and the pins it will use
-const int stepsPerRevolution = 400;                                      // for the motor. Nema34 motor has 200 steps in 360 degrees rotation (HW34-506 motor)
-const int fullrev = 400;                                                // steps in a full revolution for the turntable
+const int stepsPerRevolution = 2000;                                      // for the motor. Nema34 motor has 200 steps in 360 degrees rotation (HW34-506 motor)
+const int fullrev = 14667;                                                // steps in a full revolution for the turntable
 int halfrev = (fullrev/2);                                               // steps in half a revolution
 
-int POS;                                                                 // position variable, holds most recent position reached
-int lastPOS;
+int POS;                                                                 // POSition variable, holds most recent position reached. not Piece Of S***
+int lastPOS;                                                             // stores most recent position for comparison to POS values. Used to determine shortest route to new position
 char flag;                                                               // flag?
 
 char rainflag;                                                           // 0 = no rain, 1 = raining (if raining, add 180 degrees to position, see lines 40 and 54)
@@ -37,14 +37,14 @@ QuickStats stats;
 
 void setup()
 {
-  stepper.setMaxSpeed(30);                                               // self explanatory (in steps per second)
-  stepper.setAcceleration(10);                                           // self explanatory (use 10 (steps*s^-2) for a standardized 45 steps to decelerate to zero)
+  stepper.setMaxSpeed(200);                                               // self explanatory (in steps per second)
+  stepper.setAcceleration(80);                                            // self explanatory (use 10 (steps*s^-2) for a standardized 45 steps to decelerate to zero)
   Serial.begin(9600);                                                    // activates serial interface
   pinMode(10, OUTPUT);                                                   // set pin 10 as output (pin 10 connects to ENABLE+ pin on stepper driver, necessary to operate motor)
   digitalWrite(10, HIGH);                                                // set pin 10 to logic HIGH (to ENABLE your stepper driver)
 }
 void forward()                                                           // your function for moving the turntable forwards
-{
+{ 
   rainflag = 0;                                                          // for testing purposes, delete later
   if (rainflag == 0)                                                     // if its not raining
   {
@@ -64,7 +64,7 @@ void forward()                                                           // your
   }    
   if (POS - lastPOS > halfrev)
   {
-    POS = POS - fullrev; 
+    POS -= fullrev; 
     Serial.println(" ");
     Serial.print(" adjusted steps away from zero: ");    
     Serial.print(POS);
@@ -90,27 +90,25 @@ void getFreq()
   total = 0;
   for (x=0;x<10;x++)
     {
+    wait();
     FreqCounter::f_comp= 8;                                              // Set compensation to 12
-    FreqCounter::start(100);                                             // Start counting with gatetime of 1s
+    FreqCounter::start(100);                                             // Start counting with gatetime of 2s
+    
     while (FreqCounter::f_ready == 0)                                    // wait until counter ready
- 
+
     frq=FreqCounter::f_freq;                                             // read result
-    
-      /*if (frq = 0 || frq < 100 || frq > 460)
-      {
-        //frq = lastfrq;
-      }
-    */
-    total = frq + total;                                                 // add result to running total
-    
-    
+    if (frq == 0)
+    {
+      frq = lastfrq;
+    }
+    total += frq;                                                 // add result to running total
+     
     lastfrq = frq;
     Serial.print("frq is ");                                          
     Serial.println(frq);                                                 // print result
     Serial.print("total is ");
     Serial.println(total);
-    frq = table[x];
-    wait();                                                              // call wait function for _____ ms wait period
+    wait();                                                     // call wait function for _____ ms wait period
     }
   stddev = (stats.stdev(table,10));                                      // get a standard deviation
   Serial.println(stddev);
@@ -127,10 +125,9 @@ void wait()
 { 
  Serial.println("waiting");
  previousTime = millis();
- while (millis() - previousTime < 2000) {};                              // while 2000 ms haven't passed since function commenced, do nothing
- if((millis() - previousTime) > 2000) 
+ while (millis() - previousTime < 1000) {};                              // while 2000 ms haven't passed since function commenced, do nothing
+ if((millis() - previousTime) > 1000) 
  {                                                                       // if 2000 ms have passed since function commenced, do following
-   x++;
    previousTime = millis();                                              // reset your previousTime value again
    Serial.print(x);
  }
@@ -171,7 +168,7 @@ void getAngle()
     Serial.println(", after conversion.");
   Serial.println(theta);
   delay(200);
-  POS = theta*fullrev/360;                                                  // convert POS in degrees into POS in # of steps
+  POS = theta*fullrev/360;                                               // convert POS in degrees into POS in # of steps
   Serial.println(" ");
   Serial.print(" steps away from zero: ");
   Serial.println(POS);
@@ -180,8 +177,9 @@ void getAngle()
 } 
 void loop() 
 {
-  for (i = 0; i < 11; i++)                                              // run this specific loop x10
+  for (i = 0; i < 11; i++)                                              // run this specific for loop x10, before zeroing out turntable
   {
+    
     getFreq();                                                          // get your average frequency reading
     total = 0;                                                          // reset the total of your frq readings to be 0
     getAngle();                                                         // get your angular POS, based on your frq reading
