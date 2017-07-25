@@ -1,0 +1,204 @@
+// include stepper library
+#include <AccelStepper.h>
+#include <Stepper.h>
+#include <MsTimer2.h>
+#include "QuickStats.h"
+
+AccelStepper stepper(1, 8, 9);                                           // Define a stepper and the pins it will use
+const int stepsPerRevolution = 2000;                                     // for the motor. Nema34 motor has 200 steps in 360 degrees rotation (HW34-506 motor)
+const int fullrev = 14667;                                               // steps in a full revolution for the turntable
+int halfrev = (fullrev/2);                                               // steps in half a revolution
+
+int POS;                                                                 // POSition variable, holds most recent position reached. 
+int lastPOS;                                                             // stores most recent position for comparison to POS values. Used to determine shortest route to new position
+char flag;                                                               // flag?
+
+char rainflag;                                                           // 0 = no rain, 1 = raining (if raining, add 180 degrees to position, see lines 40 and 54)
+char x;                                                                  // for counting your # of frequency readings, for averaging
+char i;                                                                  // for counting up to 10 position adjustments before zeroing out your turntable
+
+int total;                                                               // variable for the running total of frequencies, resets after averaging them out
+int avg;                                                                 // running average of frequencies, uses the total above                                                   
+long int frq;                                                            // your frequency reading in the getFreq() function
+long int lastfrq;                                                        // your last frequency reading, used to calculate your total
+float previousTime;                                                      // used in your timing functions. (previous time - current time = time elapsed)
+
+int reading;                                                             // stores your frequency, adjusted for a 0:360 range
+int theta;                                                               // your angular position, in terms of degrees (0:360)
+                                                                         // includes appropriate vector math for dealing with wind dir.
+float table[10] = {};
+int stddev;
+float windAvgX;                                                          // averaged X component of wind vector
+float windAvgY;                                                          // averaged Y component of wind vector
+
+QuickStats stats;
+
+void setup()
+{
+  stepper.setMaxSpeed(400);                                              // self explanatory (in steps per second)
+  stepper.setAcceleration(100);                                           // self explanatory (use 10 (steps*s^-2) for a standardized 45 steps to decelerate to zero)
+  Serial.begin(9600);                                                    // activates serial interface
+  pinMode(6, OUTPUT);                                                   // set pin 10 as output (pin 10 connects to ENABLE+ pin on stepper driver, necessary to operate motor)
+  analogWrite(6, 254);                                                // set pin 10 to logic HIGH (to ENABLE your stepper driver)
+}
+void forward()                                                           // your function for moving the turntable forwards
+{                                                                        // for testing purposes, delete later
+  Serial.println(" enter rainflag:    0 = acceptable conditions,     1 = unacceptable conditions ");                                                                                 
+  while(Serial.available()==0) {}                                                 // waits until value is entered (entering a value prompts a 1, which exits while loop)
+  rainflag=Serial.parseInt();                                                          // save value as your input 
+  if (rainflag != 0 && rainflag != 1)
+  {
+    forward();
+  }
+  while(Serial.available() > 0) {Serial.read();};                                 // wish i knew why this works. without this, your serial buffer doesn't clear, which causes issues with reading new inputs                                                                                   
+  if (POS - lastPOS > halfrev)
+  {
+    POS -= fullrev; 
+  }
+  if (rainflag == 0)                                                     // if its not raining
+  {
+    Serial.print(", forward: good conditions, ");                        // skip to end of function
+  }  
+  if (rainflag == 1 && POS>=0)                                           // if its raining and ______
+  {
+    Serial.print(", forward: precipitating");                            // offset your POS to be 180 degrees away from intended POS
+    if (POS>=0)
+    {
+      POS -= halfrev;
+    }
+  if (rainflag == 1 && POS>=0)                                           // if its raining and ______
+    if (POS<0)
+    {
+      POS += halfrev;     
+    }                                   
+  }    
+
+    Serial.println(" ");
+    Serial.print(" adjusted steps away from zero: ");    
+    Serial.print(POS);
+    delay(200);                                                           
+  stepper.moveTo(POS);                                                   // move towards your position value
+  Serial.println(" ");
+  while (stepper.currentPosition() != (POS))                             // constant speed towards your POS, until a certain number of steps from it (here, 45 steps away)
+    {
+      stepper.run();                                                     // run until 40 steps away from zero
+    }
+  stepper.stop();                                                        // stop as fast as possible
+  Serial.println("past stop");
+  stepper.runToPosition();                                               // run to POS
+  Serial.println("done");    
+  Serial.println("-------------------------------------------------------------------------");                                             
+  delay(100);
+  lastPOS = POS;
+}
+void getPOS() 
+{
+  lastfrq = frq;
+  total = 0;                                            
+    
+    Serial.print(" enter a new position, between 0 & 360 degrees, where 0 is north and 180 is south ");
+                                                                                 
+    while(Serial.available()==0) {}                                                 // waits until value is entered (entering a value prompts a 1, which exits while loop)
+    frq=Serial.parseInt();                                                          // save value as your input 
+    while(Serial.available() > 0) {Serial.read();};                                 // wish i knew why this works. without this, your serial buffer doesn't clear, which causes issues with reading new inputs                                                                                   
+  
+    Serial.print("frq is ");                                          
+    Serial.println(frq);                                                            // print result
+    wait2s();                                                                       // call wait function for _____ ms wait period
+
+}
+void wait2s()
+{ 
+ Serial.println("waiting 1s");
+ previousTime = millis();
+ while (millis() - previousTime < 2000) {};                              // while 2000 ms haven't passed since function commenced, do nothing
+ if((millis() - previousTime) > 2000) 
+ {                                                                       // if 2000 ms have passed since function commenced, do following
+   previousTime = millis();                                              // reset your previousTime value again
+   Serial.print(x);
+ }
+}
+void wait5m()
+{ 
+ Serial.println("waiting 5m");
+ previousTime = millis();
+ while (millis() - previousTime < 300000) {};                            // while 2000 ms haven't passed since function commenced, do nothing
+ if((millis() - previousTime) > 300000) 
+ {                                                                       // if 2000 ms have passed since function commenced, do following
+   previousTime = millis();                                              // reset your previousTime value again
+   Serial.print(x);
+ }
+}
+void getAngle()
+{ 
+    Serial.println(" ");
+    Serial.print(frq);                                             // print reading
+    Serial.println(" degrees");
+    Serial.println(" ");
+    delay(200);
+
+    // convert reading to radians
+    float theta = frq / 180.0 * PI;                                  // convert reading to radians
+    delay(200);
+
+    // running average? possible here
+    windAvgX = cos(theta);                                               // get X & Y components for vector math
+    windAvgY = sin(theta);
+    Serial.print("AvgX, radians ");
+    Serial.println(windAvgX);         
+    delay(100);
+    Serial.print("AvgY, radians ");
+    Serial.println(windAvgY);
+    delay(100);
+
+    // get the result in degrees
+    theta =  atan2(windAvgY, windAvgX) / PI * 180;                       // convert back to degrees
+    delay(100);
+    Serial.print(theta);
+    Serial.println(", before conversion.");
+    delay(100);
+                                                                         // result is -180 to 180. change this to 0-360.
+    if (theta < 0) theta += 360;
+    delay(100);
+    Serial.print(theta);
+    Serial.println(", after conversion.");
+  Serial.println(theta);
+  delay(200);
+  POS = theta*fullrev/360;                                               // convert POS in degrees into POS in # of steps
+  Serial.println(" ");
+  Serial.println(" steps away from zero, before conversions: ");
+  Serial.println(POS);
+  Serial.println(" ");
+  delay(200);
+} 
+void zero()                                                              // your function for moving the turntable forwards
+{                                                             
+  stepper.moveTo(0);          
+  while (POS != 0)
+  {
+    stepper.run();
+  }                   
+  stepper.stop(); 
+  /*              
+  stepper.moveTo(fullrev*1.1)                                            // guarantees you hit every position on the turntable at least once
+  while (//while emitter not triggered))                                 // constant speed towards your POS, until a certain number of steps from it (here, 45 steps away)
+    {
+      stepper.run();                                                     // run until 40 steps away from zero
+    }
+  stepper.stop();                                                        // stop as fast as possible
+  stepper.setCurrentPosition();
+  */
+  Serial.println(" ");
+  Serial.println("zeroed out, FSSP facing North");
+  stepper.runToPosition();                                               // run to POS
+  Serial.print("done");                                                 
+  delay(100);
+  lastPOS = POS;
+}
+void loop() 
+{
+    getPOS();                                                           // get your average frequency reading                                                         
+    getAngle();                                                         // get your angular POS, based on your frq reading
+    forward();                                                          // moves turntable to appropriate position, depending on weather
+    //zero();                                                             // function that zeroes out your turntable, after above loop runs x10
+}
