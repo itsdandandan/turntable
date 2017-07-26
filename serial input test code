@@ -50,7 +50,8 @@ void forward()                                                           // your
   {
     forward();
   }
-  while(Serial.available() > 0) {Serial.read();};                                 // wish i knew why this works. without this, your serial buffer doesn't clear, which causes issues with reading new inputs                                                                                   
+  while(Serial.available() > 0) {Serial.read();};                        // without this, your serial buffer doesn't clear, which causes issues with reading new inputs
+                                                                                   
   if (POS - lastPOS > halfrev)
   {
     POS -= fullrev; 
@@ -62,21 +63,17 @@ void forward()                                                           // your
   if (rainflag == 1 && POS>=0)                                           // if its raining and ______
   {
     Serial.print(", forward: precipitating");                            // offset your POS to be 180 degrees away from intended POS
-    if (POS>=0)
     {
       POS -= halfrev;
     }
-  if (rainflag == 1 && POS>=0)                                           // if its raining and ______
-    if (POS<0)
+  if (rainflag == 1 && POS<0)                                           // if its raining and ______
     {
-      POS += halfrev;     
-    }                                   
-  }    
-
-    Serial.println(" ");
-    Serial.print(" adjusted steps away from zero: ");    
-    Serial.print(POS);
-    delay(200);                                                           
+      POS += halfrev;                                       
+    }  
+  Serial.println(" ");
+  Serial.print(" adjusted steps away from zero: ");    
+  Serial.print(POS);
+  delay(200);                                                           
   stepper.moveTo(POS);                                                   // move towards your position value
   Serial.println(" ");
   while (stepper.currentPosition() != (POS))                             // constant speed towards your POS, until a certain number of steps from it (here, 45 steps away)
