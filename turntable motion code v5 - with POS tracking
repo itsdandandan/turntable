@@ -27,8 +27,8 @@ int avgtheta;
 int i;
 int j;
 float theta;
-int halfrevcount;
-int fullrevcount;
+//int halfrevcount;
+//int fullrevcount;
 
 void setup() 
 {
@@ -44,18 +44,18 @@ void setup()
 
 void loop() 
 { 
-  POS = 0;
-  halfrevcount = 0;
-  fullrevcount = 0;
-  for(j = 0; j++; j>20)
-  {
+  //POS = 0;
+  //halfrevcount = 0;
+  //fullrevcount = 0;
+  //for(j = 0; j++; j>20)
+  //{
     total = 0;
     convert();
     delay(4000); 
     forward();
-  }
-  POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
-  forward();
+  //}
+  //POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
+  //forward();
 }
 void convert ()
 {
