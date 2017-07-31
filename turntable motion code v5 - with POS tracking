@@ -53,22 +53,24 @@ void loop()
     convert();
     delay(4000); 
     forward();
+    logData();
   //}
   //POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
   //forward();
 }
+
 void convert ()
-{
-for (i = 0; i < 4; i++)                                              // run this specific loop x10
-{
-    getFreq();                                                          // get your average frequency reading
-    getAngle();                                                         // get your angular POS, based on your frq reading
-}
+  {
+  for (i = 0; i < 4; i++)                                              // run this specific loop x10
+    {
+      getFreq();                                                          // get your average frequency reading
+      getAngle();                                                         // get your angular POS, based on your frq reading
+    }
   theta = total / 4;  
   if (theta < 0)
-  {
+    {
     theta += 360;
-  }
+    }
   Serial.println(" ");
   Serial.println(theta);
   Serial.println(" ");
@@ -92,6 +94,7 @@ void getFreq()
   }
   delay(200);
 }
+
 void wait30s()
 {
  Serial.println(" ");
@@ -160,6 +163,7 @@ void ending()
   delay(200);
   wait30s();
 }
+
 void forward()
 {
   lastPOS = POS;
@@ -222,3 +226,18 @@ void forward()
   lastPOS = POS;
 }
 
+void logData()
+
+{
+    Serial.print("#S|LOGDATA|[");
+    Serial.print(itoa(POS, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(rainflag, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(flag, buffer, 10));
+    Serial.print(";");
+    Serial.println("]#");
+
+    Serial.print("#S|SENDLOG|[]#");
+    Serial.print("#S|COPYOVER|[]#");
+}
