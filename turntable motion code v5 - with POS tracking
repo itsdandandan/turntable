@@ -25,7 +25,10 @@ int x;
 int avgreading;
 int avgtheta;
 int i;
+int j;
 float theta;
+int halfrevcount;
+int fullrevcount;
 
 void setup() 
 {
@@ -40,10 +43,18 @@ void setup()
 }
 
 void loop() 
-{
-  total = 0;
-  convert();
-  delay(4000); 
+{ 
+  POS = 0;
+  halfrevcount = 0;
+  fullrevcount = 0;
+  for(j = 0; j++; j>20)
+  {
+    total = 0;
+    convert();
+    delay(4000); 
+    forward();
+  }
+  POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
   forward();
 }
 void convert ()
@@ -159,21 +170,32 @@ void forward()
     Serial.print(", forward: good conditions, ");                        // skip to end of function
     POS -= fullrev;
     flag = 1;
+    fullrevcount--;
   }  
-  if (rainflag == 0 && flag == 0 && POS < halfrev)
+  if (rainflag == 0 && flag == 0 && POS < -halfrev)
   {
+    Serial.print(", forward: good conditions, ");
     POS += fullrev;
+    flag = 1;
+    fullrevcount++;
+  }
+  if (rainflag == 0 && flag == 0)
+  {
     flag = 1;
   }
   if (rainflag == 1 && flag == 0 && POS >= halfrev)                                                     // if its raining
   {
+    Serial.print(", forward: raining, ");
     POS -= halfrev;
     flag = 1;
+    halfrevcount--;
   }
   if (rainflag == 1 && flag == 0 && POS < halfrev)
   {
+    Serial.print(", forward: raining, ");
     POS += halfrev;
     flag = 1;
+    halfrevcount++;
   }
   if (POS - lastPOS > halfrev)
   {
@@ -182,6 +204,7 @@ void forward()
     Serial.print(" adjusted steps away from zero: ");    
     Serial.print(POS);
     delay(200);
+    fullrevcount--;
   }                                                           
   stepper.moveTo(POS);                                                   // move towards your position value
   Serial.println(" ");
