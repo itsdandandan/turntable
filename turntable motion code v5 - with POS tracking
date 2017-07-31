@@ -27,8 +27,9 @@ int avgtheta;
 int i;
 int j;
 float theta;
-//int halfrevcount;
-//int fullrevcount;
+iflag = 0;
+int halfrevcount;
+int fullrevcount;
 
 void setup() 
 {
@@ -47,16 +48,22 @@ void loop()
   //POS = 0;
   //halfrevcount = 0;
   //fullrevcount = 0;
-  //for(j = 0; j++; j>20)
-  //{
+  for(j = 0; j++; j>20)
+  {
     total = 0;
     convert();
     delay(4000); 
     forward();
     logData();
-  //}
-  //POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
-  //forward();
+  }
+  if((millis() - previousTime) > 3600000) 
+  {
+    Serial.print("#S|SENDLOG|[]#");
+    Serial.print("#S|COPYOVER|[]#");
+    previousTime = millis();
+    //POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
+    //forward();
+  }
 }
 
 void convert ()
@@ -201,7 +208,7 @@ void forward()
     flag = 1;
     halfrevcount++;
   }
-  if (POS - lastPOS > halfrev)
+  if (POS - lastPOS > halfrev && iflag == 0)
   {
     POS -= fullrev; 
     Serial.println(" ");
@@ -235,9 +242,5 @@ void logData()
     Serial.print(itoa(rainflag, buffer, 10));
     Serial.print(";");
     Serial.print(itoa(flag, buffer, 10));
-    Serial.print(";");
     Serial.println("]#");
-
-    Serial.print("#S|SENDLOG|[]#");
-    Serial.print("#S|COPYOVER|[]#");
 }
