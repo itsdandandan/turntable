@@ -1,0 +1,245 @@
+// include stepper library
+#include <AccelStepper.h>
+#include <Stepper.h>
+#include <MsTimer2.h>
+#include "QuickStats.h"
+#include <FreqCounter.h> 
+
+AccelStepper stepper(1, 8, 9);                                           // Define a stepper and the pins it will use
+const int stepsPerRevolution = 2000;                                     // for the motor. Nema34 motor has 200 steps in 360 degrees rotation (HW34-506 motor)
+const int fullrev = 14667;                                               // steps in a full revolution for the turntable
+int halfrev = (fullrev/2);                                               // steps in half a revolution
+
+int analogPin = 0;
+int reading;
+int total;
+float previousTime;
+float windAvgY;
+float windAvgX;
+int lastread;
+int lastPOS;
+int flag;
+int rainflag;
+int POS;
+int x;
+int avgreading;
+int avgtheta;
+int i;
+int j;
+float theta;
+int iflag = 0;
+int halfrevcount;
+int fullrevcount;
+int voltageinDegrees;
+int diff;
+
+void setup() 
+{
+  // put your setup code here, to run once:
+  stepper.setMaxSpeed(400);                                               // self explanatory (in steps per second)
+  stepper.setAcceleration(125);                                            // self explanatory (use 10 (steps*s^-2) for a standardized 45 steps to decelerate to zero)
+  Serial.begin(9600);                                                    // activates serial interface
+  pinMode(6, OUTPUT);                                                   // set pin 10 as output (pin 10 connects to ENABLE+ pin on stepper driver, necessary to operate motor)
+  digitalWrite(6, HIGH);                                                // set pin 10 to logic HIGH (to ENABLE your stepper driver)
+
+  Serial.begin(9600);
+}
+
+void loop() 
+{ 
+  //POS = 0;
+  //halfrevcount = 0;
+  //fullrevcount = 0;
+  //for(j = 0; j++; j>20)
+  //{
+    total = 0;
+    convert();
+    delay(2000); 
+    forward();
+    logData();
+  //}
+  if((millis() - previousTime) > 3600000)  // wait this long before logging
+  {
+    Serial.println(" ");
+    delay(4000);
+    Serial.println("#S|SENDLOG|[]#");       // emails log to self
+    Serial.println(" ");
+    delay(4000);
+    Serial.println("#S|COPYOVER|[]#");      // overwrites old log file with a blank
+    Serial.println(" ");
+    delay(4000);
+    Serial.println("#S|COPYOVER2|[]#");     
+    Serial.println(" ");
+    previousTime = millis();
+    //POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
+    //forward();
+  }
+}
+
+void convert ()
+  {
+  for (i = 0; i < 30; i++)                                              // run this specific loop x10
+    {
+      getFreq();                                                          // get your average frequency reading
+      getAngle();                                                         // get your angular POS, based on your frq reading
+    }
+  theta = total / 30;  
+  if (theta < 0)          // since theta in range of -180:180
+    {
+    theta += 360;         // convert -180:0 to 180:360
+    }
+  //Serial.println(" ");
+  //Serial.println(theta);
+  //Serial.println(" ");
+  POS = map(theta,0,360,0,fullrev);
+  forward();
+}
+
+void getFreq()
+{
+  reading = analogRead(analogPin);
+  //Serial.print("reading, in volts: ");
+  //Serial.println(reading);
+  reading = map(reading,0,1024,0,360);
+  voltageinDegrees = reading;
+  //Serial.println(" ");
+  //Serial.print("reading, in degrees: ");
+  //Serial.println(reading);
+  
+  if (reading <= 360 && reading >= 354)
+  {
+    reading = 0;
+  }
+  delay(200);
+}
+
+void wait30s()
+{
+ //Serial.println(" ");
+ //Serial.println("waiting 1s");
+ previousTime = millis();
+ while (millis() - previousTime < 30000) {};                              // while 30000 ms haven't passed since function commenced, do nothing
+ if((millis() - previousTime) > 30000) 
+ {                                                                       // if 30000 ms have passed since function commenced, do following
+   previousTime = millis();                                              // reset your previousTime value again
+   Serial.print(x);
+ }
+}
+void getAngle()
+{ 
+  /*
+    Serial.println(" ");
+    Serial.print(frq);                                             // print reading
+    Serial.println(" degrees");
+    Serial.println(" ");
+    delay(200);
+  */
+    // convert reading to radians
+    float theta = reading / 180.0 * PI;                                  // convert reading to radians
+    //Serial.println(" ");
+    ///Serial.println(theta);
+    delay(2000);
+
+    // running average? possible here
+    //Serial.println(theta);
+    windAvgX = cos(theta);                                               // get X & Y components for vector math
+    windAvgY = sin(theta);
+    //Serial.print("AvgX, radians ");
+    //Serial.println(windAvgX);         
+    delay(100);
+    //Serial.print("AvgY, radians ");
+    //Serial.println(windAvgY);
+    delay(100);
+
+    // get the result in degrees
+    theta =  atan2(windAvgY, windAvgX) / PI * 180;                       // convert back to degrees
+    delay(100);
+    //Serial.print(theta);
+    delay(200);
+  //Serial.print("converted theta after vector math: ");
+  //Serial.print(theta);                                                                     // result is -180 to 180. change this to 0-360.
+  delay(2000);
+  total = theta + total;
+  //Serial.print("# of readings: ");
+  //Serial.println(i);
+  //Serial.print("total of theta: ");
+  //Serial.println(total);
+}
+
+void forward()
+{
+  lastPOS = POS;
+  flag = 0;
+  rainflag = 0;                                                          // for testing purposes, delete later
+  if (rainflag == 0 && flag == 0 && POS >= halfrev)                                                    // if its not raining
+  {
+    //Serial.print(", forward: good conditions, ");                        // skip to end of function
+    POS -= fullrev;
+    flag = 1;
+    fullrevcount--;
+  }  
+  if (rainflag == 0 && flag == 0 && POS < -halfrev)
+  {
+    //Serial.print(", forward: good conditions, ");
+    POS += fullrev;
+    flag = 1;
+    fullrevcount++;
+  }
+  if (rainflag == 0 && flag == 0)
+  {
+    flag = 1;
+  }
+  if (rainflag == 1 && flag == 0 && POS >= (halfrev/2))                                                     // if its raining
+  {
+    //Serial.print(", forward: raining, ");
+    POS -= halfrev;
+    flag = 1;
+    halfrevcount--;
+  }
+  if (rainflag == 1 && flag == 0 && POS < (-halfrev/2))
+  {
+    //Serial.print(", forward: raining, ");
+    POS += halfrev;
+    flag = 1;
+    halfrevcount++;
+  }
+  diff = POS - lastPOS;
+  if (diff > halfrev && iflag == 0)
+  {
+    POS -= fullrev; 
+    //Serial.println(" ");
+    //Serial.print(" adjusted steps away from zero: ");    
+    //Serial.print(POS);
+    delay(200);
+    fullrevcount--;
+  }                                                           
+  stepper.moveTo(POS);                                                   // move towards your position value
+  //Serial.println(" ");
+  while (stepper.currentPosition() != (POS))                             // constant speed towards your POS, until a certain number of steps from it (here, 45 steps away)
+                                                                         // 45 is used because at our speed and acceleration, the table decelerates to zero in 45 steps. just for convenience.
+                                                                         // speed & acceleration can be modified, # steps has to be modified as well. can write a function to do this math.
+    {
+      stepper.run();                                                     // run until 40 steps away from zero
+    }
+  stepper.stop();                                                        // stop as fast as possible
+  //Serial.println("past stop");
+  stepper.runToPosition();                                               // run to POS
+  //Serial.print("done");                                                 
+  delay(100);
+}
+
+void logData()
+
+{    
+    char buffer[5];
+    
+    Serial.print("#S|LOGDATA|[");
+    Serial.print(itoa(POS, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(voltageinDegrees, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(rainflag, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(flag, buffer, 10));
+    Serial.println("]#");
+}
