@@ -216,8 +216,7 @@ void forward()
   stepper.moveTo(POS);                                                   // move towards your position value
   //Serial.println(" ");
   while (stepper.currentPosition() != (POS))                             // constant speed towards your POS, until a certain number of steps from it (here, 45 steps away)
-                                                                         // 45 is used because at our speed and acceleration, the table decelerates to zero in 45 steps. just for convenience.
-                                                                         // speed & acceleration can be modified, # steps has to be modified as well. can write a function to do this math.
+                                                                         
     {
       stepper.run();                                                     // run until 40 steps away from zero
     }
