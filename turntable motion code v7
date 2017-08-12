@@ -1,0 +1,308 @@
+// include stepper library
+#include <AccelStepper.h>
+#include <Stepper.h>
+#include <MsTimer2.h>
+#include "QuickStats.h"
+#include <FreqCounter.h> 
+
+AccelStepper stepper(1, 8, 9);                                           // Define a stepper and the pins it will use
+const int stepsPerRevolution = 2000;                                     // for the motor. Nema34 motor has 200 steps in 360 degrees rotation (HW34-506 motor)
+const int fullrev = 14667;                                               // steps in a full revolution for the turntable
+int halfrev = (fullrev/2);                                               // steps in half a revolution
+
+int voltage;
+int analogPin = 0;
+int reading;
+int total;
+float previousTime;
+float previousTime2;
+float windAvgY;
+float windAvgX;
+int lastread;
+int lastPOS;
+int flag;
+int rainflag;
+int POS;
+int x;
+int avgreading;
+int avgtheta;
+int i;
+int j;
+float theta;
+int moveflag = 0;
+int iflag = 0;
+int halfrevcount;
+int fullrevcount;
+int voltageinDegrees;
+int diff;
+int reading1;
+int reading2;
+int repeatflag;
+
+void setup() 
+{
+  // put your setup code here, to run once:
+  stepper.setMaxSpeed(500);                                               // self explanatory (in steps per second)
+  stepper.setAcceleration(250);                                            // self explanatory (use 10 (steps*s^-2) for a standardized 45 steps to decelerate to zero)
+  Serial.begin(9600);                                                    // activates serial interface
+  pinMode(6, OUTPUT);                                                   // set pin 10 as output (pin 10 connects to ENABLE+ pin on stepper driver, necessary to operate motor)
+  digitalWrite(6, HIGH);                                                // set pin 10 to logic HIGH (to ENABLE your stepper driver)
+
+  Serial.begin(9600);
+}
+
+void loop() 
+{ 
+  //POS = 0;
+  //halfrevcount = 0;
+  //fullrevcount = 0;
+  //for(j = 0; j++; j>20)
+  //{
+    total = 0;
+    convert();
+    forward();
+    delay(2000);
+  //}
+  if((millis() - previousTime) > 3600000)  // wait this long before syncing to ftp
+  {
+    Serial.println(" ");
+    delay(4000);
+    Serial.println("#S|SENDLOG|[]#");       // emails log to self
+    Serial.println(" ");
+    delay(4000);
+    Serial.println("#S|COPYOVER2|[]#");     
+    Serial.println(" ");
+    delay(4000);
+    Serial.println("#S|FTPUPLOAD|[]#");     
+    Serial.println(" ");
+    previousTime=millis();
+  }
+  /*
+  if((millis() - previousTime2) > (3599999*24))
+  {
+    delay(4000);
+    Serial.println("#S|COPYOVER|[]#");      // overwrites old log file with a blank + send to FTP
+    Serial.println(" ");
+    previousTime2 = millis();
+    //POS = ((0.5*halfrevcount) + fullrevcount)*fullrev;
+    //forward();
+  */
+}
+
+void convert ()
+  {
+  for (i = 0; i < 50; i++)                                              // run this specific loop x10
+    {
+      getFreq();                                                          // get your average frequency reading
+      getAngle();                                                         // get your angular POS, based on your frq reading
+      logData();
+    }
+  theta = total / 50;  
+  if (theta < 0)          // since theta in range of -180:180
+    {
+    theta += 360;         // convert -180:180 to 0:360
+    }
+  //Serial.println(" ");
+  //Serial.println(theta);
+  //Serial.println(" ");
+  zero();
+  delay(2000);
+  POS = map(theta,0,360,0,fullrev);
+  delay(2000);
+  forward();
+}
+
+void getFreq()
+{
+  voltage = analogRead(analogPin);
+  //Serial.print("reading, in volts: ");
+  //Serial.println(reading);
+  reading1 = map(voltage,0,1024,360,0);
+  if (reading1 <= 354 && reading1 >= 360)
+  {
+    reading1 = 0;
+  }
+  //reading2 = map(reading1,0,360,360,0);
+  //Serial.println(" ");
+  //Serial.print("reading, in degrees: ");
+  //Serial.println(reading);
+  
+  delay(200);
+}
+
+void wait30s()
+{
+ //Serial.println(" ");
+ //Serial.println("waiting 1s");
+ previousTime = millis();
+ while (millis() - previousTime < 30000) {};                              // while 30000 ms haven't passed since function commenced, do nothing
+ if((millis() - previousTime) > 30000) 
+ {                                                                       // if 30000 ms have passed since function commenced, do following
+   previousTime = millis();                                              // reset your previousTime value again
+   Serial.print(x);
+ }
+}
+void getAngle()
+{ 
+  /*
+    Serial.println(" ");
+    Serial.print(frq);                                             // print reading
+    Serial.println(" degrees");
+    Serial.println(" ");
+    delay(200);
+  */
+    // convert reading to radians
+    float theta = reading1 / 180.0 * PI;                                  // convert reading to radians
+    //Serial.println(" ");
+    ///Serial.println(theta);
+    delay(2000);
+
+    // running average? possible here
+    //Serial.println(theta);
+    windAvgX = cos(theta);                                               // get X & Y components for vector math
+    windAvgY = sin(theta);
+    //Serial.print("AvgX, radians ");
+    //Serial.println(windAvgX);         
+    delay(100);
+    //Serial.print("AvgY, radians ");
+    //Serial.println(windAvgY);
+    delay(100);
+
+    // get the result in degrees
+    theta =  atan2(windAvgY, windAvgX) / PI * 180;                       // convert back to degrees
+    delay(100);
+    //Serial.print(theta);
+    delay(200);
+  //Serial.print("converted theta after vector math: ");
+  //Serial.print(theta);                                                                     // result is -180 to 180. change this to 0-360.
+  delay(2000);
+  total = theta + total;
+  //Serial.print("# of readings: ");
+  //Serial.println(i);
+  //Serial.print("total of theta: ");
+  //Serial.println(total);
+}
+
+void forward()
+{
+  stepper.setMaxSpeed(400);                                               // self explanatory (in steps per second)
+  stepper.setAcceleration(200);
+  flag = 0;
+  rainflag = 0;     // for testing purposes, delete later   
+  
+  /*
+  if (POS - lastPOS < 300 || POS - lastPOS > 300)
+  {
+    flag = 1;
+    repeatflag = 1;
+  }
+  */
+  
+  if (rainflag == 0 && flag == 0 && POS >= halfrev)                                                    // if its not raining
+  {
+    //Serial.print(", forward: good conditions, ");                        // skip to end of function
+    //POS -= fullrev;
+    flag = 1;
+    //fullrevcount--;
+  }  
+  if (rainflag == 0 && flag == 0 && POS < -halfrev)
+  {
+    //Serial.print(", forward: good conditions, ");
+    //POS += fullrev;
+    flag = 1;
+    //fullrevcount++;
+  }
+  if (rainflag == 0 && flag == 0)
+  {
+    flag = 1;
+  }
+  if (rainflag == 1 && flag == 0 && POS >= (halfrev/2))                                                     // if its raining
+  {
+    //Serial.print(", forward: raining, ");
+    //POS -= halfrev;
+    flag = 1;
+    //halfrevcount--;
+  }
+  if (rainflag == 1 && flag == 0 && POS < (-halfrev/2))
+  {
+    //Serial.print(", forward: raining, ");
+    //POS += halfrev;
+    flag = 1;
+    //halfrevcount++;
+  }
+  /* if (diff > halfrev && iflag == 0)
+  {
+    POS -= fullrev; 
+    //Serial.println(" ");
+    //Serial.print(" adjusted steps away from zero: ");    
+    //Serial.print(POS);
+    delay(200);
+    fullrevcount--;
+  }
+  */ 
+  if (repeatflag != 1)
+  {                                                          
+  stepper.moveTo(POS);   
+  // move towards your position value
+  //Serial.println(" ");
+  //while (stepper.currentPosition() != (POS-500 || POS+500))                             // constant speed towards your POS, until a certain number of steps from it (here, 45 steps away)
+                                                                         // 45 is used because at our speed and acceleration, the table decelerates to zero in 45 steps. just for convenience.
+                                                                         // speed & acceleration can be modified, # steps has to be modified as well. can write a function to do this math.
+    {
+      //stepper.run();                                                     // run until 40 steps away from zero
+    }
+  //stepper.stop();                                                        // stop as fast as possible
+  //Serial.println("past stop");
+  stepper.runToPosition();                                               // run to POS
+  //Serial.print("done");                                                 
+  delay(100);
+  }
+  if (moveflag != 1)
+  {
+  moveflag = 1;
+  }
+  repeatflag = 0;
+  lastPOS = POS;
+}
+
+void logData()
+
+{    
+    char buffer[5];
+    
+    Serial.print("#S|LOGDATA|[");
+    Serial.print(itoa(voltage, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(reading1, buffer, 10));
+    Serial.print(";");
+    //Serial.print(itoa(reading2, buffer, 10));
+    //Serial.print(";");
+    Serial.print(itoa(theta, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(rainflag, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(flag, buffer, 10));
+    Serial.print(";");
+    Serial.print(itoa(POS, buffer, 10));
+    Serial.println("]#");
+}
+void zero()
+{
+  if (moveflag == 1)
+  {                                         
+  stepper.moveTo(0);                                                   // move towards your position value
+  //Serial.println(" ");
+  //while (stepper.currentPosition() != (500 || -500))                             // constant speed towards your POS, until a certain number of steps from it (here, 45 steps away)
+                                                                         // 45 is used because at our speed and acceleration, the table decelerates to zero in 45 steps. just for convenience.
+                                                                         // speed & acceleration can be modified, # steps has to be modified as well. can write a function to do this math.
+    {
+      //stepper.run();                                                     // run until 40 steps away from zero
+    }
+  stepper.runToPosition();                                               // run to POS
+  stepper.setCurrentPosition(0);
+  
+  //Serial.print("done");                                                 
+  delay(100);                                                   // move to zero before each new position call
+  
+  }               
+}
